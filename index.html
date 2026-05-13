@@ -1,0 +1,819 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ledger — Tasks</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#f4f1ea">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Ledger">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,600;1,9..144,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #f4f1ea;
+    --ink: #1a1a1a;
+    --ink-soft: #6b6660;
+    --rule: #d9d3c7;
+    --accent: #c8553d;
+    --p1: #c8553d;
+    --p2: #d4a017;
+    --p3: #8a9a5b;
+    --done: #b8b2a6;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: 'Fraunces', Georgia, serif;
+    font-optical-sizing: auto;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    background-image:
+      radial-gradient(circle at 25% 30%, rgba(0,0,0,0.015) 1px, transparent 1px),
+      radial-gradient(circle at 75% 70%, rgba(0,0,0,0.02) 1px, transparent 1px);
+    background-size: 8px 8px, 12px 12px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 64px 48px 120px;
+    position: relative;
+    z-index: 1;
+  }
+
+  header {
+    border-bottom: 1px solid var(--ink);
+    padding-bottom: 24px;
+    margin-bottom: 48px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+  }
+
+  .masthead h1 {
+    font-family: 'Fraunces', serif;
+    font-weight: 300;
+    font-size: 64px;
+    line-height: 0.95;
+    letter-spacing: -0.03em;
+    font-variation-settings: "opsz" 144;
+  }
+
+  .masthead h1 em {
+    font-style: italic;
+    font-weight: 400;
+  }
+
+  .masthead .tagline {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    color: var(--ink-soft);
+    margin-top: 12px;
+  }
+
+  .date-stamp {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: var(--ink-soft);
+    text-align: right;
+  }
+
+  .date-stamp .day {
+    display: block;
+    font-size: 32px;
+    font-family: 'Fraunces', serif;
+    font-weight: 300;
+    color: var(--ink);
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin-top: 4px;
+  }
+
+  /* Compose */
+  .compose {
+    background: rgba(255,255,255,0.4);
+    border: 1px solid var(--rule);
+    padding: 24px;
+    margin-bottom: 48px;
+    position: relative;
+  }
+
+  .compose::before {
+    content: "+ NEW ENTRY";
+    position: absolute;
+    top: -8px;
+    left: 16px;
+    background: var(--paper);
+    padding: 0 8px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.2em;
+    color: var(--ink-soft);
+  }
+
+  .compose input[type="text"] {
+    width: 100%;
+    background: transparent;
+    border: none;
+    font-family: 'Fraunces', serif;
+    font-size: 22px;
+    font-weight: 400;
+    color: var(--ink);
+    outline: none;
+    padding: 8px 0;
+    border-bottom: 1px dashed var(--rule);
+    margin-bottom: 20px;
+  }
+
+  .compose input[type="text"]::placeholder {
+    color: var(--ink-soft);
+    font-style: italic;
+  }
+
+  .compose-row {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .field-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .field-group label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: var(--ink-soft);
+  }
+
+  .compose input[type="date"],
+  .compose input[type="time"],
+  .compose select {
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid var(--rule);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--ink);
+    padding: 4px 0;
+    outline: none;
+    cursor: pointer;
+  }
+
+  .compose select {
+    appearance: none;
+    padding-right: 16px;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='8' height='8' viewBox='0 0 8 8'><path d='M1 2.5l3 3 3-3' stroke='%231a1a1a' fill='none'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right center;
+  }
+
+  .add-btn {
+    margin-left: auto;
+    background: var(--ink);
+    color: var(--paper);
+    border: none;
+    padding: 12px 24px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    cursor: pointer;
+    transition: background 0.2s ease;
+  }
+
+  .add-btn:hover {
+    background: var(--accent);
+  }
+
+  /* Filter bar */
+  .filters {
+    display: flex;
+    gap: 24px;
+    margin-bottom: 32px;
+    border-bottom: 1px solid var(--rule);
+    padding-bottom: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+  }
+
+  .filter {
+    background: none;
+    border: none;
+    color: var(--ink-soft);
+    cursor: pointer;
+    padding: 0;
+    position: relative;
+    transition: color 0.2s ease;
+  }
+
+  .filter.active {
+    color: var(--ink);
+  }
+
+  .filter.active::after {
+    content: "";
+    position: absolute;
+    bottom: -13px;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: var(--accent);
+  }
+
+  .filter .count {
+    color: var(--ink-soft);
+    margin-left: 4px;
+  }
+
+  /* Task list */
+  .tasks {
+    list-style: none;
+  }
+
+  .task {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 20px;
+    align-items: start;
+    padding: 24px 0;
+    border-bottom: 1px solid var(--rule);
+    position: relative;
+    animation: slideIn 0.4s ease;
+  }
+
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateY(-8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .check {
+    width: 22px;
+    height: 22px;
+    border: 1.5px solid var(--ink);
+    border-radius: 50%;
+    cursor: pointer;
+    background: transparent;
+    transition: all 0.25s ease;
+    margin-top: 4px;
+    position: relative;
+    flex-shrink: 0;
+  }
+
+  .check:hover {
+    background: var(--ink);
+  }
+
+  .task.done .check {
+    background: var(--ink);
+  }
+
+  .task.done .check::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 10px;
+    height: 5px;
+    border-left: 1.5px solid var(--paper);
+    border-bottom: 1.5px solid var(--paper);
+    transform: translate(-50%, -65%) rotate(-45deg);
+  }
+
+  .task-body {
+    min-width: 0;
+  }
+
+  .task-title {
+    font-family: 'Fraunces', serif;
+    font-size: 20px;
+    font-weight: 400;
+    line-height: 1.35;
+    color: var(--ink);
+    word-wrap: break-word;
+  }
+
+  .task.done .task-title {
+    color: var(--done);
+    text-decoration: line-through;
+    text-decoration-thickness: 1px;
+  }
+
+  .task-meta {
+    display: flex;
+    gap: 16px;
+    margin-top: 8px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--ink-soft);
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .priority-dot {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .priority-dot::before {
+    content: "";
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: currentColor;
+  }
+
+  .priority-dot.p1 { color: var(--p1); }
+  .priority-dot.p2 { color: var(--p2); }
+  .priority-dot.p3 { color: var(--p3); }
+
+  .task-actions {
+    display: flex;
+    gap: 4px;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+  }
+
+  .task:hover .task-actions {
+    opacity: 1;
+  }
+
+  .icon-btn {
+    background: none;
+    border: 1px solid transparent;
+    color: var(--ink-soft);
+    cursor: pointer;
+    padding: 6px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    transition: all 0.2s ease;
+  }
+
+  .icon-btn:hover {
+    color: var(--ink);
+    border-color: var(--rule);
+  }
+
+  .icon-btn.danger:hover {
+    color: var(--accent);
+    border-color: var(--accent);
+  }
+
+  /* Empty state */
+  .empty {
+    text-align: center;
+    padding: 80px 24px;
+    color: var(--ink-soft);
+  }
+
+  .empty .ornament {
+    font-family: 'Fraunces', serif;
+    font-size: 48px;
+    font-style: italic;
+    font-weight: 300;
+    color: var(--rule);
+    margin-bottom: 16px;
+  }
+
+  .empty p {
+    font-family: 'Fraunces', serif;
+    font-style: italic;
+    font-size: 16px;
+  }
+
+  /* Footer */
+  .colophon {
+    margin-top: 80px;
+    padding-top: 24px;
+    border-top: 1px solid var(--rule);
+    display: flex;
+    justify-content: space-between;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    color: var(--ink-soft);
+  }
+
+  /* Toast */
+  .toast {
+    position: fixed;
+    bottom: 32px;
+    left: 50%;
+    transform: translateX(-50%) translateY(120%);
+    background: var(--ink);
+    color: var(--paper);
+    padding: 14px 24px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    transition: transform 0.4s cubic-bezier(0.2, 0.9, 0.3, 1);
+    z-index: 100;
+  }
+
+  .toast.show {
+    transform: translateX(-50%) translateY(0);
+  }
+
+  @media (max-width: 600px) {
+    .container { padding: 32px 24px 80px; }
+    .masthead h1 { font-size: 44px; }
+    header { flex-direction: column; align-items: flex-start; gap: 16px; }
+    .date-stamp { text-align: left; }
+    .compose-row { flex-direction: column; align-items: stretch; }
+    .add-btn { margin-left: 0; }
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+
+  <header>
+    <div class="masthead">
+      <h1>The <em>Ledger</em></h1>
+      <div class="tagline">A Daily Record of Intentions &amp; Acts</div>
+    </div>
+    <div class="date-stamp">
+      <span id="weekday">—</span>
+      <span class="day" id="dayNum">—</span>
+      <span id="monthYear">—</span>
+    </div>
+  </header>
+
+  <section class="compose">
+    <input type="text" id="taskInput" placeholder="What needs doing?" maxlength="200">
+    <div class="compose-row">
+      <div class="field-group">
+        <label>Date</label>
+        <input type="date" id="taskDate">
+      </div>
+      <div class="field-group">
+        <label>Time</label>
+        <input type="time" id="taskTime">
+      </div>
+      <div class="field-group">
+        <label>Priority</label>
+        <select id="taskPriority">
+          <option value="3">Low</option>
+          <option value="2" selected>Medium</option>
+          <option value="1">High</option>
+        </select>
+      </div>
+      <button class="add-btn" id="addBtn">Inscribe</button>
+    </div>
+  </section>
+
+  <div class="filters">
+    <button class="filter active" data-filter="all">All <span class="count" id="count-all">0</span></button>
+    <button class="filter" data-filter="active">Open <span class="count" id="count-active">0</span></button>
+    <button class="filter" data-filter="done">Settled <span class="count" id="count-done">0</span></button>
+    <button class="filter" data-filter="priority">By Priority</button>
+  </div>
+
+  <ul class="tasks" id="taskList"></ul>
+
+  <div class="empty" id="emptyState" style="display:none;">
+    <div class="ornament">❦</div>
+    <p>The ledger awaits its first entry.</p>
+  </div>
+
+  <footer class="colophon">
+    <span>Set in Fraunces &amp; JetBrains Mono</span>
+    <span id="totalStat">— entries</span>
+  </footer>
+</div>
+
+<div class="toast" id="toast">Saved</div>
+
+<script>
+  const STORAGE_KEY = 'ledger.tasks.v1';
+  let tasks = [];
+  let currentFilter = 'all';
+
+  // ---------- Date header ----------
+  function updateDateHeader() {
+    const now = new Date();
+    const weekdays = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+    const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    document.getElementById('weekday').textContent = weekdays[now.getDay()];
+    document.getElementById('dayNum').textContent = String(now.getDate()).padStart(2,'0');
+    document.getElementById('monthYear').textContent = months[now.getMonth()] + ' · ' + now.getFullYear();
+  }
+
+  // ---------- Storage ----------
+  function loadTasks() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      tasks = raw ? JSON.parse(raw) : [];
+    } catch (e) {
+      tasks = [];
+    }
+  }
+
+  function saveTasks() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
+    } catch (e) {
+      console.warn('Storage failed', e);
+    }
+  }
+
+  // ---------- Toast ----------
+  let toastTimer;
+  function toast(msg) {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.classList.remove('show'), 2000);
+  }
+
+  // ---------- Rendering ----------
+  function priorityLabel(p) {
+    return p == 1 ? 'High' : p == 2 ? 'Medium' : 'Low';
+  }
+
+  function formatDate(dateStr, timeStr) {
+    if (!dateStr) return '';
+    const d = new Date(dateStr + 'T' + (timeStr || '00:00'));
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    let s = `${months[d.getMonth()]} ${d.getDate()}`;
+    if (timeStr) {
+      const hours = d.getHours();
+      const mins = String(d.getMinutes()).padStart(2,'0');
+      const ampm = hours >= 12 ? 'PM' : 'AM';
+      const h12 = hours % 12 || 12;
+      s += ` · ${h12}:${mins} ${ampm}`;
+    }
+    return s;
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({
+      '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+    })[c]);
+  }
+
+  function render() {
+    const list = document.getElementById('taskList');
+    const empty = document.getElementById('emptyState');
+
+    // Filter
+    let visible = tasks.slice();
+    if (currentFilter === 'active') visible = visible.filter(t => !t.done);
+    else if (currentFilter === 'done') visible = visible.filter(t => t.done);
+    else if (currentFilter === 'priority') {
+      visible.sort((a, b) => {
+        if (a.done !== b.done) return a.done ? 1 : -1;
+        return a.priority - b.priority;
+      });
+    }
+
+    if (currentFilter !== 'priority') {
+      // Sort: open first, then by date
+      visible.sort((a, b) => {
+        if (a.done !== b.done) return a.done ? 1 : -1;
+        if (a.date && b.date) return (a.date + (a.time||'')).localeCompare(b.date + (b.time||''));
+        if (a.date) return -1;
+        if (b.date) return 1;
+        return a.created - b.created;
+      });
+    }
+
+    list.innerHTML = '';
+    if (visible.length === 0) {
+      empty.style.display = 'block';
+    } else {
+      empty.style.display = 'none';
+      visible.forEach(t => {
+        const li = document.createElement('li');
+        li.className = 'task' + (t.done ? ' done' : '');
+        const meta = [];
+        if (t.date) meta.push(`<span>${escapeHtml(formatDate(t.date, t.time))}</span>`);
+        meta.push(`<span class="priority-dot p${t.priority}">${priorityLabel(t.priority)} priority</span>`);
+
+        li.innerHTML = `
+          <button class="check" aria-label="Toggle complete" data-id="${t.id}"></button>
+          <div class="task-body">
+            <div class="task-title">${escapeHtml(t.title)}</div>
+            <div class="task-meta">${meta.join('')}</div>
+          </div>
+          <div class="task-actions">
+            ${t.date ? `<button class="icon-btn" data-action="ics" data-id="${t.id}">.ics</button>` : ''}
+            <button class="icon-btn danger" data-action="delete" data-id="${t.id}">Delete</button>
+          </div>
+        `;
+        list.appendChild(li);
+      });
+    }
+
+    // Counts
+    document.getElementById('count-all').textContent = tasks.length;
+    document.getElementById('count-active').textContent = tasks.filter(t => !t.done).length;
+    document.getElementById('count-done').textContent = tasks.filter(t => t.done).length;
+    document.getElementById('totalStat').textContent = tasks.length + ' ' + (tasks.length === 1 ? 'entry' : 'entries');
+  }
+
+  // ---------- Actions ----------
+  function addTask() {
+    const titleEl = document.getElementById('taskInput');
+    const title = titleEl.value.trim();
+    if (!title) {
+      titleEl.focus();
+      return;
+    }
+    const date = document.getElementById('taskDate').value;
+    const time = document.getElementById('taskTime').value;
+    const priority = parseInt(document.getElementById('taskPriority').value, 10);
+
+    tasks.push({
+      id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+      title,
+      date,
+      time,
+      priority,
+      done: false,
+      created: Date.now()
+    });
+
+    titleEl.value = '';
+    document.getElementById('taskDate').value = '';
+    document.getElementById('taskTime').value = '';
+    document.getElementById('taskPriority').value = '2';
+    saveTasks();
+    render();
+    toast('Inscribed');
+  }
+
+  function toggleTask(id) {
+    const t = tasks.find(x => x.id === id);
+    if (t) {
+      t.done = !t.done;
+      saveTasks();
+      render();
+    }
+  }
+
+  function deleteTask(id) {
+    tasks = tasks.filter(t => t.id !== id);
+    saveTasks();
+    render();
+    toast('Removed');
+  }
+
+  // ---------- .ics export ----------
+  function pad(n) { return String(n).padStart(2, '0'); }
+
+  function toICSDate(dateStr, timeStr) {
+    if (timeStr) {
+      const d = new Date(dateStr + 'T' + timeStr);
+      return d.getUTCFullYear() +
+        pad(d.getUTCMonth()+1) +
+        pad(d.getUTCDate()) + 'T' +
+        pad(d.getUTCHours()) +
+        pad(d.getUTCMinutes()) +
+        pad(d.getUTCSeconds()) + 'Z';
+    } else {
+      return dateStr.replace(/-/g, '');
+    }
+  }
+
+  function exportICS(id) {
+    const t = tasks.find(x => x.id === id);
+    if (!t || !t.date) return;
+
+    const now = new Date();
+    const stamp = now.getUTCFullYear() + pad(now.getUTCMonth()+1) + pad(now.getUTCDate()) +
+                  'T' + pad(now.getUTCHours()) + pad(now.getUTCMinutes()) + pad(now.getUTCSeconds()) + 'Z';
+
+    const allDay = !t.time;
+    let dtStart, dtEnd;
+
+    if (allDay) {
+      dtStart = `DTSTART;VALUE=DATE:${toICSDate(t.date)}`;
+      // All-day events end the next day per ICS spec
+      const endDate = new Date(t.date + 'T00:00:00');
+      endDate.setDate(endDate.getDate() + 1);
+      const endStr = endDate.getFullYear() + pad(endDate.getMonth()+1) + pad(endDate.getDate());
+      dtEnd = `DTEND;VALUE=DATE:${endStr}`;
+    } else {
+      dtStart = `DTSTART:${toICSDate(t.date, t.time)}`;
+      // Default 30 min duration
+      const start = new Date(t.date + 'T' + t.time);
+      const end = new Date(start.getTime() + 30 * 60000);
+      const endStr = end.getUTCFullYear() + pad(end.getUTCMonth()+1) + pad(end.getUTCDate()) + 'T' +
+                     pad(end.getUTCHours()) + pad(end.getUTCMinutes()) + pad(end.getUTCSeconds()) + 'Z';
+      dtEnd = `DTEND:${endStr}`;
+    }
+
+    const priorityICS = t.priority === 1 ? 1 : t.priority === 2 ? 5 : 9;
+    const summary = t.title.replace(/[\\;,\n]/g, m => '\\' + (m === '\n' ? 'n' : m));
+
+    const ics = [
+      'BEGIN:VCALENDAR',
+      'VERSION:2.0',
+      'PRODID:-//Ledger//Tasks//EN',
+      'CALSCALE:GREGORIAN',
+      'BEGIN:VEVENT',
+      `UID:${t.id}@ledger.local`,
+      `DTSTAMP:${stamp}`,
+      dtStart,
+      dtEnd,
+      `SUMMARY:${summary}`,
+      `PRIORITY:${priorityICS}`,
+      `DESCRIPTION:Priority: ${priorityLabel(t.priority)}`,
+      'END:VEVENT',
+      'END:VCALENDAR'
+    ].join('\r\n');
+
+    const safeName = t.title.replace(/[^a-z0-9]+/gi, '_').slice(0, 40) || 'event';
+    const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${safeName}.ics`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 100);
+    toast('Downloaded .ics');
+  }
+
+  // ---------- Event wiring ----------
+  document.getElementById('addBtn').addEventListener('click', addTask);
+  document.getElementById('taskInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter') addTask();
+  });
+
+  document.getElementById('taskList').addEventListener('click', e => {
+    const target = e.target.closest('[data-id]');
+    if (!target) return;
+    const id = target.dataset.id;
+    const action = target.dataset.action;
+    if (target.classList.contains('check')) toggleTask(id);
+    else if (action === 'delete') deleteTask(id);
+    else if (action === 'ics') exportICS(id);
+  });
+
+  document.querySelectorAll('.filter').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.filter').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentFilter = btn.dataset.filter;
+      render();
+    });
+  });
+
+  // ---------- Init ----------
+  updateDateHeader();
+  loadTasks();
+  render();
+
+  // Refresh date at midnight
+  setInterval(updateDateHeader, 60000);
+
+  // Register service worker for offline support and installability
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js').catch(err => {
+        console.warn('SW registration failed:', err);
+      });
+    });
+  }
+</script>
+
+</body>
+</html>
