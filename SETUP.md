@@ -56,5 +56,6 @@ On **mobile**: open the URL in Chrome/Safari → menu → "Add to Home Screen."
 
 - Your tasks are stored in your browser's localStorage on **each device separately** — they don't sync between devices.
 - The app works fully offline once installed.
+- **Notifications:** The first time you open the app, a banner asks to enable notifications. Click "Enable" and approve the browser prompt. Reminders fire at the task's due time (or 9 AM for tasks without a specific time). If the app wasn't running when a task came due, you'll get a catch-up notification next time you open it, and the overdue task will show in red.
 - To update the app later, just upload new versions of the files to the same repo. The service worker will pick up changes on next launch.
 - If you ever want to take it offline, just delete the repo (or set it to Private).

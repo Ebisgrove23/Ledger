@@ -455,6 +455,93 @@
     .compose-row { flex-direction: column; align-items: stretch; }
     .add-btn { margin-left: 0; }
   }
+
+  /* Notification permission banner */
+  .notif-banner {
+    background: rgba(200, 85, 61, 0.08);
+    border: 1px solid var(--accent);
+    border-left-width: 3px;
+    padding: 16px 20px;
+    margin-bottom: 32px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    font-family: 'Fraunces', serif;
+    font-size: 14px;
+    color: var(--ink);
+    animation: slideIn 0.4s ease;
+  }
+
+  .notif-banner .notif-text {
+    flex: 1;
+    font-style: italic;
+  }
+
+  .notif-banner button {
+    background: var(--ink);
+    color: var(--paper);
+    border: none;
+    padding: 8px 16px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    cursor: pointer;
+    transition: background 0.2s ease;
+  }
+
+  .notif-banner button:hover { background: var(--accent); }
+
+  .notif-banner button.secondary {
+    background: transparent;
+    color: var(--ink-soft);
+    border: 1px solid var(--rule);
+  }
+
+  .notif-banner button.secondary:hover {
+    color: var(--ink);
+    background: transparent;
+    border-color: var(--ink);
+  }
+
+  /* Overdue tasks */
+  .task.overdue:not(.done) .task-title {
+    color: var(--accent);
+  }
+
+  .task.overdue:not(.done) .check {
+    border-color: var(--accent);
+  }
+
+  .task.overdue:not(.done) .check:hover {
+    background: var(--accent);
+  }
+
+  .task.overdue:not(.done) .task-meta {
+    color: var(--accent);
+  }
+
+  .overdue-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--accent);
+    font-weight: 500;
+  }
+
+  .overdue-badge::before {
+    content: "!";
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 12px;
+    height: 12px;
+    border: 1px solid var(--accent);
+    border-radius: 50%;
+    font-family: 'Fraunces', serif;
+    font-size: 9px;
+    font-style: italic;
+  }
 </style>
 </head>
 <body>
@@ -472,6 +559,12 @@
       <span id="monthYear">—</span>
     </div>
   </header>
+
+  <div class="notif-banner" id="notifBanner" style="display:none;">
+    <span class="notif-text">Enable notifications to be reminded when tasks come due.</span>
+    <button id="notifEnable">Enable</button>
+    <button class="secondary" id="notifDismiss">Not now</button>
+  </div>
 
   <section class="compose">
     <input type="text" id="taskInput" placeholder="What needs doing?" maxlength="200">
@@ -618,11 +711,22 @@
       empty.style.display = 'block';
     } else {
       empty.style.display = 'none';
+      const now = Date.now();
       visible.forEach(t => {
+        const dueMs = taskDueMs(t);
+        const isOverdue = dueMs !== null && dueMs < now && !t.done;
+
         const li = document.createElement('li');
-        li.className = 'task' + (t.done ? ' done' : '');
+        li.className = 'task' + (t.done ? ' done' : '') + (isOverdue ? ' overdue' : '');
         const meta = [];
-        if (t.date) meta.push(`<span>${escapeHtml(formatDate(t.date, t.time))}</span>`);
+        if (t.date) {
+          const dateLabel = escapeHtml(formatDate(t.date, t.time));
+          if (isOverdue) {
+            meta.push(`<span class="overdue-badge">Overdue · ${dateLabel}</span>`);
+          } else {
+            meta.push(`<span>${dateLabel}</span>`);
+          }
+        }
         meta.push(`<span class="priority-dot p${t.priority}">${priorityLabel(t.priority)} priority</span>`);
 
         li.innerHTML = `
@@ -666,6 +770,7 @@
       time,
       priority,
       done: false,
+      notified: false,
       created: Date.now()
     });
 
@@ -674,6 +779,7 @@
     document.getElementById('taskTime').value = '';
     document.getElementById('taskPriority').value = '2';
     saveTasks();
+    scheduleTask(tasks[tasks.length - 1]);
     render();
     toast('Inscribed');
   }
@@ -688,6 +794,10 @@
   }
 
   function deleteTask(id) {
+    if (scheduledTimers.has(id)) {
+      clearTimeout(scheduledTimers.get(id));
+      scheduledTimers.delete(id);
+    }
     tasks = tasks.filter(t => t.id !== id);
     saveTasks();
     render();
@@ -802,8 +912,157 @@
   loadTasks();
   render();
 
+  // ---------- Notifications & scheduling ----------
+  const NOTIF_DISMISSED_KEY = 'ledger.notif.dismissed';
+  const scheduledTimers = new Map(); // taskId -> timeoutId
+
+  function taskDueMs(t) {
+    if (!t.date || t.done) return null;
+    const time = t.time || '09:00'; // default reminder time for all-day tasks
+    const ms = new Date(t.date + 'T' + time).getTime();
+    return isNaN(ms) ? null : ms;
+  }
+
+  function updateNotifBanner() {
+    const banner = document.getElementById('notifBanner');
+    if (!('Notification' in window)) {
+      banner.style.display = 'none';
+      return;
+    }
+    const dismissed = localStorage.getItem(NOTIF_DISMISSED_KEY) === '1';
+    const shouldShow = Notification.permission === 'default' && !dismissed;
+    banner.style.display = shouldShow ? 'flex' : 'none';
+  }
+
+  async function requestNotifPermission() {
+    if (!('Notification' in window)) {
+      toast('Notifications not supported');
+      return;
+    }
+    try {
+      const result = await Notification.requestPermission();
+      if (result === 'granted') {
+        toast('Notifications enabled');
+        scheduleAll();
+        runOverdueCatchup();
+      } else if (result === 'denied') {
+        toast('Notifications blocked');
+      }
+    } catch (e) {
+      console.warn('Permission request failed', e);
+    }
+    updateNotifBanner();
+  }
+
+  function fireNotification(t) {
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+    try {
+      const body = t.time
+        ? `${priorityLabel(t.priority)} priority · ${formatDate(t.date, t.time)}`
+        : `${priorityLabel(t.priority)} priority · due today`;
+      const n = new Notification(t.title, {
+        body,
+        icon: 'icon-192.png',
+        badge: 'icon-192.png',
+        tag: 'ledger-' + t.id,
+        requireInteraction: t.priority === 1
+      });
+      n.onclick = () => {
+        window.focus();
+        n.close();
+      };
+    } catch (e) {
+      console.warn('Notification failed', e);
+    }
+    // Mark fired so we don't re-notify on next load
+    t.notified = true;
+    saveTasks();
+  }
+
+  function scheduleTask(t) {
+    // Clear any existing timer for this task
+    if (scheduledTimers.has(t.id)) {
+      clearTimeout(scheduledTimers.get(t.id));
+      scheduledTimers.delete(t.id);
+    }
+    if (t.done || t.notified) return;
+    const dueMs = taskDueMs(t);
+    if (dueMs === null) return;
+    const delay = dueMs - Date.now();
+    if (delay <= 0) return; // already past — handled by catch-up
+    // setTimeout max is ~24.8 days; for anything further out we skip
+    // (it'll be picked up on next page load when we re-schedule)
+    if (delay > 2147483647) return;
+    const timerId = setTimeout(() => {
+      fireNotification(t);
+      render();
+    }, delay);
+    scheduledTimers.set(t.id, timerId);
+  }
+
+  function scheduleAll() {
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+    tasks.forEach(scheduleTask);
+  }
+
+  function runOverdueCatchup() {
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+    const now = Date.now();
+    const missed = tasks.filter(t => {
+      if (t.done || t.notified) return false;
+      const due = taskDueMs(t);
+      return due !== null && due < now;
+    });
+    if (missed.length === 0) return;
+
+    // Summary notification rather than spamming one per task
+    if (missed.length === 1) {
+      fireNotification(missed[0]);
+    } else {
+      try {
+        const n = new Notification(`${missed.length} tasks overdue`, {
+          body: missed.slice(0, 3).map(t => '· ' + t.title).join('\n') +
+                (missed.length > 3 ? `\n…and ${missed.length - 3} more` : ''),
+          icon: 'icon-192.png',
+          tag: 'ledger-overdue-summary'
+        });
+        n.onclick = () => { window.focus(); n.close(); };
+      } catch (e) {
+        console.warn('Summary notification failed', e);
+      }
+      missed.forEach(t => { t.notified = true; });
+      saveTasks();
+    }
+  }
+
+  // Wire up banner buttons
+  document.getElementById('notifEnable').addEventListener('click', requestNotifPermission);
+  document.getElementById('notifDismiss').addEventListener('click', () => {
+    localStorage.setItem(NOTIF_DISMISSED_KEY, '1');
+    updateNotifBanner();
+  });
+
+  // Re-scan when the tab becomes visible again (handles laptop sleep, tab switch, etc.)
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) {
+      runOverdueCatchup();
+      scheduleAll();
+      render();
+    }
+  });
+
   // Refresh date at midnight
   setInterval(updateDateHeader, 60000);
+
+  // Also re-check overdue state every minute so the UI updates as tasks pass their due time
+  setInterval(() => {
+    render();
+    scheduleAll();
+  }, 60000);
+
+  updateNotifBanner();
+  scheduleAll();
+  runOverdueCatchup();
 
   // Register service worker for offline support and installability
   if ('serviceWorker' in navigator) {
